@@ -1,58 +1,63 @@
 import os
+from flask import Flask, render_template, request
 import requests
 from collections import Counter
 from dotenv import load_dotenv
 from urllib.parse import quote
 
-# --- Load .env values ---
+app = Flask(__name__)
+
+# Load environment variables
 load_dotenv()
-PLAYER_TAG = os.getenv("PLAYER_TAG")
 API_TOKEN = os.getenv("API_TOKEN")
 
-# Check if environment variables are loaded
-if not PLAYER_TAG or not API_TOKEN:
-    print("Error: PLAYER_TAG or API_TOKEN not found in .env file")
-    exit()
+def get_top_cards(player_tag):
+    """Fetch battle logs and return top 10 opponent cards"""
+    encoded_player_tag = quote(player_tag, safe='')
+    api_url = f"https://proxy.royaleapi.dev/v1/players/{encoded_player_tag}/battlelog"
+    headers = {"Authorization": f"Bearer {API_TOKEN}"}
 
-# URL encode the player tag (handles # symbol)
-encoded_player_tag = quote(PLAYER_TAG, safe='')
+    try:
+        response = requests.get(api_url, headers=headers, timeout=10)
+        response.raise_for_status()
+        battles = response.json()
+        
+        opponent_cards = []
+        for battle in battles:
+            opponents = battle.get("opponent", [])
+            if not isinstance(opponents, list):
+                opponents = [opponents]
+            
+            for opponent in opponents:
+                cards = opponent.get("cards", [])
+                opponent_cards.extend(card["name"] for card in cards)
 
-API_URL = f"https://proxy.royaleapi.dev/v1/players/{encoded_player_tag}/battlelog"
-headers = {
-    "Authorization": f"Bearer {API_TOKEN}"
-}
-
-print(f"Requesting: {API_URL}")
-print(f"Player tag: {PLAYER_TAG}")
-
-# --- Get Battle Logs ---
-response = requests.get(API_URL, headers=headers)
-if response.status_code != 200:
-    print("Error:", response.status_code, response.text)
-    print("Make sure your PLAYER_TAG includes the # symbol and your API_TOKEN is valid")
-    exit()
-
-battles = response.json()
-
-# --- Extract Opponent Cards ---
-opponent_cards = []
-for battle in battles:
-    # Handle both single opponent and team battles
-    opponents = battle.get("opponent", [])
-    if not isinstance(opponents, list):
-        opponents = [opponents]
+        counter = Counter(opponent_cards)
+        return counter.most_common(10)
     
-    for opponent in opponents:
-        cards = opponent.get("cards", [])
-        opponent_cards.extend(card["name"] for card in cards)
+    except Exception as e:
+        print(f"API Error: {str(e)}")
+        return None
 
-# --- Count Top 3 ---
-counter = Counter(opponent_cards)
-top_10 = counter.most_common(10)
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    chart_data = None
+    player_tag = ""
+    error = None
+    
+    if request.method == 'POST':
+        player_tag = request.form['player_tag'].strip()
+        if player_tag:
+            chart_data = get_top_cards(player_tag)
+            if not chart_data:
+                error = "Error fetching data. Check your player tag or try again later."
+        else:
+            error = "Please enter a valid player tag"
+    
+    return render_template('index.html', 
+                          chart_data=chart_data, 
+                          player_tag=player_tag, 
+                          error=error)
 
-if not top_10:
-    print("No opponent cards found in recent battles")
-else:
-    print("🔥 Top 10 Most Common Cards You've Faced Recently:")
-    for card, count in top_10:
-        print(f" - {card}: {count} times")
+if __name__ == '__main__':
+    app.run(debug=True)

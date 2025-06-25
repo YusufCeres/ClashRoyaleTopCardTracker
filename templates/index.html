@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clash Royale Card Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <i class="fa-solid fa-crown"></i>
+            <h1>Clash Royale Card Tracker</h1>
+            <i class="fa-solid fa-tower-battle"></i>
+        </div>
+        
+        <form method="POST">
+            <div class="input-group">
+                <i class="fa-solid fa-hashtag"></i>
+                <input type="text" 
+                       name="player_tag" 
+                       value="{{ player_tag }}" 
+                       placeholder="Enter your Player Tag (e.g. #ABC123)" 
+                       required>
+            </div>
+            <button type="submit">
+                <i class="fa-solid fa-magnifying-glass"></i> Analyze Battles
+            </button>
+        </form>
+
+        {% if error %}
+            <div class="error"><i class="fa-solid fa-triangle-exclamation"></i> {{ error }}</div>
+        {% endif %}
+
+        {% if chart_data %}
+            <div class="results">
+                <h2>Top Cards You've Faced</h2>
+                
+                <!-- Top 3 Cards Section -->
+                <div class="top-cards">
+                    {% for card, count in chart_data[:3] %}
+                    <div class="top-card rank-{{ loop.index }}">
+                        <div class="top-card-rank">
+                            <i class="fa-solid fa-crown"></i> {{ loop.index }}
+                        </div>
+                        <div class="top-card-name">{{ card }}</div>
+                        <div class="top-card-count">{{ count }} battles</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                
+                <!-- Full Card List -->
+                <div class="card-list">
+                    {% for card, count in chart_data %}
+                    <div class="card-item">
+                        <div class="card-rank">{{ loop.index }}</div>
+                        <div class="card-info">
+                            <div class="card-name">{{ card }}</div>
+                            <div class="card-bar">
+                                <div class="bar-fill" style="width: {{ (count / chart_data[0][1]) * 100 }}%"></div>
+                            </div>
+                        </div>
+                        <div class="card-count">{{ count }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+        
+        <div class="footer">
+            <p>Analyzes your last 25 battles | Clash Royale Card Tracker</p>
+        </div>
+    </div>
+</body>
+</html>
